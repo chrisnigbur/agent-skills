@@ -17,7 +17,7 @@ task or extend it. Nothing ends on its own.
 
 ```
 /plugin marketplace add chrisnigbur/agent-skills
-/plugin install daily-routine@agent-skills
+/plugin install daily-routine@chrisnigbur-skills
 /daily-routine:setup
 ```
 

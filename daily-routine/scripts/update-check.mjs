@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Prints one line when a newer daily-routine is on agent-skills main, and one line when the
+// Prints one line when a newer daily-routine is on the chrisnigbur-skills marketplace's main, and one line when the
 // current folder's routine.json lacks a field a newer setup adds; prints nothing otherwise.
 //
 //   node update-check.mjs          (run from the routine folder)
 //
-// A marketplace install lives in ~/.claude/plugins/cache/agent-skills/daily-routine/<version>/.
+// A marketplace install lives in ~/.claude/plugins/cache/chrisnigbur-skills/daily-routine/<version>/.
 // The marketplace clone may be shallow, so compare file contents: the git hash of each installed
 // file against daily-routine/ on origin/main. Never updates or writes anything, and stays quiet
 // offline, when run from a plain checkout, or on any error.
@@ -16,6 +16,8 @@ import { spawnSync } from 'node:child_process'
 import { CONFIG_FIELDS } from './lib/config.mjs'
 
 const PLUGIN = 'daily-routine'
+// The marketplace's name (marketplace.json). 'agent-skills' is reserved for Anthropic's own repos.
+export const MARKETPLACE = 'chrisnigbur-skills'
 const PREFIX = `${PLUGIN}/`
 
 export function staleFiles({ treeLines, hashOf }) {
@@ -43,8 +45,8 @@ export function updateLines({ cwd = process.cwd(), root = resolve(dirname(fileUR
   } catch { /* unreadable config: session-start reports it */ }
 
   try {
-    if (!/[\\/]plugins[\\/]cache[\\/]agent-skills[\\/]daily-routine[\\/]/.test(root + '/')) return lines
-    const clone = join(homedir(), '.claude', 'plugins', 'marketplaces', 'agent-skills')
+    if (!(root + '/').split(/[\\/]/).join('/').includes(`/plugins/cache/${MARKETPLACE}/${PLUGIN}/`)) return lines
+    const clone = join(homedir(), '.claude', 'plugins', 'marketplaces', MARKETPLACE)
     if (!existsSync(clone)) return lines
     const git = (...a) => spawnSync('git', ['-C', clone, ...a], {
       encoding: 'utf8', timeout: 8000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
@@ -56,7 +58,7 @@ export function updateLines({ cwd = process.cwd(), root = resolve(dirname(fileUR
       treeLines: tree.stdout.trim().split('\n'),
       hashOf: rel => { const f = join(root, rel); return existsSync(f) ? git('hash-object', f).stdout.trim() : '' },
     })
-    if (changed) lines.push(`daily-routine: a newer version is on agent-skills (${changed} file${changed === 1 ? '' : 's'} changed). Update with: claude plugin marketplace update agent-skills && claude plugin update daily-routine@agent-skills, then restart Claude Code.`)
+    if (changed) lines.push(`daily-routine: a newer version is on ${MARKETPLACE} (${changed} file${changed === 1 ? '' : 's'} changed). Update with: claude plugin marketplace update ${MARKETPLACE} && claude plugin update ${PLUGIN}@${MARKETPLACE}, then restart Claude Code.`)
   } catch { /* never get in the way of a session */ }
   return lines
 }

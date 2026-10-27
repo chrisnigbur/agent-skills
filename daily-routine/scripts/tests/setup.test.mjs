@@ -85,16 +85,16 @@ test('--auto-update keeps unrelated user settings and other marketplaces', () =>
   const u = json(userFile)
   assert.equal(u.theme, 'dark')
   assert.deepEqual(u.extraKnownMarketplaces.other, { source: { source: 'github', repo: 'a/b' } })
-  assert.deepEqual(u.extraKnownMarketplaces['agent-skills'], { source: { source: 'github', repo: 'chrisnigbur/agent-skills' }, autoUpdate: true })
+  assert.deepEqual(u.extraKnownMarketplaces['chrisnigbur-skills'], { source: { source: 'github', repo: 'chrisnigbur/agent-skills' }, autoUpdate: true })
   assert.match(setup(p, '--auto-update').stdout, /private repo: auto-update uses this machine's git login/)
 })
 
 test('rules: the Bash rule pattern covers the plugin cache path (a version folder after daily-routine)', () => {
   const rule = allowRules({})[0].slice('Bash('.length, -1)
   const re = new RegExp('^' + rule.split('*').map(s => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$')
-  assert.ok(re.test('node "C:/Users/A B/.claude/plugins/cache/agent-skills/daily-routine/0.1.0/scripts/routine.mjs" status'))
+  assert.ok(re.test('node "C:/Users/A B/.claude/plugins/cache/chrisnigbur-skills/daily-routine/0.1.0/scripts/routine.mjs" status'))
   assert.ok(re.test('node C:/src/agent-skills/daily-routine/scripts/routine.mjs status'))
-  assert.ok(re.test('node "D:\\Home\\A B\\.claude\\plugins\\cache\\agent-skills\\daily-routine\\0.1.0\\scripts\\routine.mjs" status'), 'backslash path')
+  assert.ok(re.test('node "D:\\Home\\A B\\.claude\\plugins\\cache\\chrisnigbur-skills\\daily-routine\\0.1.0\\scripts\\routine.mjs" status'), 'backslash path')
 })
 
 test('rules not duplicated on re-run, other folder settings kept', () => {

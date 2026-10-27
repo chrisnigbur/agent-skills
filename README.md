@@ -1,7 +1,8 @@
 # agent-skills
 
 Agent skills and Claude Code plugins. Each plugin is a top-level folder; the repo is also a
-Claude Code plugin marketplace named `agent-skills`.
+Claude Code plugin marketplace named `chrisnigbur-skills` (the name `agent-skills` is reserved
+for Anthropic's own marketplaces).
 
 | Plugin | What it does |
 |---|---|
@@ -11,7 +12,7 @@ Claude Code plugin marketplace named `agent-skills`.
 
 ```
 /plugin marketplace add chrisnigbur/agent-skills
-/plugin install daily-routine@agent-skills
+/plugin install daily-routine@chrisnigbur-skills
 /daily-routine:setup
 ```
 

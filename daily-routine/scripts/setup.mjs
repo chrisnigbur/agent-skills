@@ -5,7 +5,7 @@
 //
 // Writes <folder>/routine.json, CLAUDE.md (only if absent), tasks/ runs/ shared/, the folder's
 // .claude/settings.json permission rules, ~/.daily-routine.json (so other sessions can find the
-// folder), and with --auto-update the agent-skills marketplace entry in ~/.claude/settings.json.
+// folder), and with --auto-update the chrisnigbur-skills marketplace entry in ~/.claude/settings.json.
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { parseConfig, isModelName } from './lib/config.mjs'
 import { allowRules } from './lib/rules.mjs'
 import { parseArgs } from './routine.mjs'
+import { MARKETPLACE } from './update-check.mjs'
 
 const TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates', 'routine.json')
 const readJson = file => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
@@ -71,18 +72,18 @@ settings.permissions = { ...(settings.permissions ?? {}), allow: [...allow, ...a
 writeJson(settingsFile, settings)
 console.log(added.length ? `added ${added.length} permission rules to ${settingsFile}` : `permission rules already in ${settingsFile}`)
 
-// --- automatic updates for the agent-skills marketplace (user settings)
+// --- automatic updates for the chrisnigbur-skills marketplace (user settings)
 if (flags['auto-update']) {
   const userFile = join(home, '.claude', 'settings.json')
   const u = readJson(userFile)
   u.extraKnownMarketplaces = u.extraKnownMarketplaces ?? {}
-  u.extraKnownMarketplaces['agent-skills'] = {
-    ...(u.extraKnownMarketplaces['agent-skills'] ?? {}),
+  u.extraKnownMarketplaces[MARKETPLACE] = {
+    ...(u.extraKnownMarketplaces[MARKETPLACE] ?? {}),
     source: { source: 'github', repo: 'chrisnigbur/agent-skills' },
     autoUpdate: true,
   }
   writeJson(userFile, u)
-  console.log(`turned on automatic updates for agent-skills in ${userFile}`)
+  console.log(`turned on automatic updates for ${MARKETPLACE} in ${userFile}`)
   console.log("private repo: auto-update uses this machine's git login and never prompts. Make sure a plain `git ls-remote https://github.com/chrisnigbur/agent-skills` works without asking for a password (see the README's Private repo section).")
 }
 

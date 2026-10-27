@@ -1,10 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { staleFiles, missingFields } from '../update-check.mjs'
+import { staleFiles, missingFields, MARKETPLACE } from '../update-check.mjs'
 import { routine } from './fixtures.mjs'
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -57,4 +57,10 @@ test('session-start exits 0 with a corrupt routine.json', () => {
   const r = run('session-start.mjs', folder)
   assert.equal(r.status, 0)
   assert.match(r.stdout, /daily-routine: routine\.json could not be read/)
+})
+
+test('the marketplace name matches marketplace.json and is not a reserved name', () => {
+  const market = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.claude-plugin', 'marketplace.json'), 'utf8'))
+  assert.equal(MARKETPLACE, 'chrisnigbur-skills')
+  assert.equal(market.name, MARKETPLACE)
 })
