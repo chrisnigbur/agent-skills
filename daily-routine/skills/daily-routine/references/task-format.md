@@ -32,6 +32,7 @@ names the line, and only that task fails to load.
 | `requires` | requirement names from `routine.json` (`[vpn]`); the task waits while one is not met |
 | `model` | model for this task; overrides `routine.json` |
 | `roles` | optional `fetch:` and `judge:` models; the task then runs in two steps |
+| `shadow` | optional `model:` (required), `until:` (default 5) and `scope:` (`full`, or `judge` with roles): a second model answers the same brief and is compared with the main one; ended only by `decide adopt-shadow` or `decide unshadow`. The comparison log is `shadow.md` in the task folder |
 | `memory` | global memory entry names (file names without `.md`) included in the brief |
 | `shared` | files in `shared/` included in the brief (`shared/RULES.md` always is) |
 | `after` | tasks that must run first; their results are included in the brief |

@@ -20,6 +20,9 @@ task file, and ask only about what it can't fill in.
 3. **Ask only for the gaps**, one at a time. Usually that is the end: a date, a condition, or
    none. Sometimes a model, when the task is plain data fetching (`sonnet`) or needs careful
    judgment (`opus`).
+   **Shadow:** a task copied from an existing routine (a check that already ran on another
+   model) gets `model: opus` and a shadow, `shadow:` with `model: sonnet` and `until: 5`, without
+   asking. For a brand-new task, ask whether to shadow it and on which model.
 4. **Show the draft** and write it after the user says OK:
    `R new <id> --title "<title>"`, then replace the new `TASK.md` with the draft (keep the
    `added` and `decisions` lines `new` wrote). Copy the SQL and scripts the steps use into the task

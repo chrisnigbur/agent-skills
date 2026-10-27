@@ -55,3 +55,14 @@ For a `fetch` step (task with roles), replace "Your answer" with: "Run only the 
 fetch work and reply with their raw output, each under the step's name. Do not judge it." The
 `judge` step gets the same brief with that raw output added under "## Fetched output" and gives the
 JSON answer without running commands again unless a fetch step clearly failed.
+
+For the **shadow** sub-agent (task with `shadow`), use the same brief with only the first Rules
+bullet replaced by:
+
+```
+- Read only, and write nothing at all: no files anywhere, not even in tasks/<task id>/fixes/. If
+  the task says how to fix a finding, describe the exact statement in "detail", report outcome
+  fix-proposed, and leave "staged" empty. Another run of this task stages the fix.
+```
+
+Its answer goes only to `R shadow`, never to `R record` or the report.

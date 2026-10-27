@@ -143,8 +143,9 @@ export function writeFrontmatter({ data, body, eol = '\n' }) {
 }
 
 // Changes a few keys in place and leaves every other line, its comments and the body exactly as
-// they were. `changes` may set `status` (a scalar), `end` (sub-keys to set) and `decisions` (the
-// full list; items beyond those already in the file are appended).
+// they were. `changes` may set `status` and `model` (scalars), `end` (sub-keys to set),
+// `decisions` (the full list; items beyond those already in the file are appended) and
+// `shadow: null` (removes the shadow block).
 export function updateFrontmatter(text, changes) {
   const bom = text.startsWith('﻿') ? '﻿' : ''
   const { lines, close, eol } = split(text)
@@ -158,10 +159,15 @@ export function updateFrontmatter(text, changes) {
     lines[i] = `${prefix} ${quote(v)}${comment.trim() ? comment : ''}`
   }
 
-  if ('status' in changes) {
-    const i = topIndex('status')
-    if (i === -1) insert(end, [`status: ${quote(changes.status)}`])
-    else setLine(i, 'status:', changes.status)
+  if ('shadow' in changes && changes.shadow === null) {
+    const i = topIndex('shadow')
+    if (i !== -1) { const stop = blockEnd(i); lines.splice(i, stop - i); end -= stop - i }
+  }
+  for (const key of ['status', 'model']) {
+    if (!(key in changes)) continue
+    const i = topIndex(key)
+    if (i === -1) insert(end, [`${key}: ${quote(changes[key])}`])
+    else setLine(i, `${key}:`, changes[key])
   }
   if (changes.end) {
     let i = topIndex('end')

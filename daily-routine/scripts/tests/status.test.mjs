@@ -118,3 +118,34 @@ test('CLI: no routine folder exits 2 with a setup hint', () => {
   assert.equal(r.status, 2)
   assert.match(r.stderr, /no routine folder: run \/daily-routine:setup/)
 })
+
+const SHADOW = { model: 'sonnet', until: 5, scope: 'full' }
+
+test('shadow: none -> shadow null, shadowDue false', () => {
+  const a = byId(status([task('a')]), 'a')
+  assert.equal(a.shadow, null)
+  assert.equal(a.shadowDue, false)
+})
+
+test('shadow: no log yet -> streak 0, not due', () => {
+  const a = byId(status([task('a', { shadow: SHADOW })]), 'a')
+  assert.deepEqual(a.shadow, { ...SHADOW, streak: 0, findingsInStreak: 0 })
+  assert.equal(a.shadowDue, false)
+})
+
+test('shadow: due at the target, still due past it', () => {
+  assert.equal(byId(status([task('a', { shadow: SHADOW, shadowLog: { streak: 4, findingsInStreak: 0 } })]), 'a').shadowDue, false)
+  assert.equal(byId(status([task('a', { shadow: SHADOW, shadowLog: { streak: 5, findingsInStreak: 0 } })]), 'a').shadowDue, true)
+  const past = byId(status([task('a', { shadow: SHADOW, shadowLog: { streak: 7, findingsInStreak: 2 } })]), 'a')
+  assert.equal(past.shadowDue, true)
+  assert.equal(past.shadow.findingsInStreak, 2)
+})
+
+test('shadow: CLI status reads shadow.md', () => {
+  const folder = routineWith({ 'a-task': '---\nid: a-task\ntitle: A\nshadow:\n  model: sonnet\n---\n' })
+  writeFileSync(join(folder, 'routine.json'), JSON.stringify({ name: 'cli routine' }))
+  writeFileSync(join(folder, 'tasks', 'a-task', 'shadow.md'), '# Shadow log: a-task\n\n| When | Verdict | Outcomes | Main | Shadow | Notes |\n|---|---|---|---|---|---|\n| 2026-10-26 13:00Z | match | clean | m | s | |\n| 2026-10-27 13:00Z | match | clean | m | s | |\n')
+  const r = spawnSync(process.execPath, [ROUTINE, 'status', '--folder', folder, '--today', '2026-10-27'], { encoding: 'utf8' })
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(JSON.parse(r.stdout).tasks[0].shadow.streak, 2)
+})
