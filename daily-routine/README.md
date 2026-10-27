@@ -77,6 +77,12 @@ and "Plugin loading" ("When auto-update runs").
   `roles` (`fetch: sonnet`, `judge: opus`) runs in two steps: a cheap model fetches the data, then
   a stronger one judges it. Version 1 uses short model names. Exact model ids and Codex may come
   later.
+- **Shadows**: before trusting a cheaper model with a task, give the task a `shadow` (`model:
+  sonnet`, `until: 5`). Each run, the shadow answers the same brief beside the main model; the
+  engine compares outcomes and numbers (not wording) and logs every run in the task's `shadow.md`.
+  The report uses only the main model's answer, shows "(shadow agrees, 3 of 5)", puts any
+  disagreement in front of you, and after five matches in a row asks whether to switch. Nothing
+  switches or stops without your word (`decide adopt-shadow` / `decide unshadow`).
 - **Fixes**: sub-agents never write. A task can stage a fix in `fixes/`. The report shows you the
   exact statement, and it runs only after your OK, followed by a re-check.
 - **Global memory**: every run starts by reading your memory index, so tasks can lean on what it

@@ -1,4 +1,5 @@
-// The user's decisions about a task's end: extend, keep (no end), retire. Every decision is
+// The user's decisions about a task: extend, keep (no end), retire, and for a shadowed task adopt-shadow
+// (switch to the shadow's model) or unshadow (stop comparing). Every decision is
 // appended to `decisions` with the date and their words; nothing is ever rewritten. Only the
 // changed lines of TASK.md are touched, so hand-written comments and values stay as they are.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -17,7 +18,11 @@ export function decide(task, action, { until, condition, note, today }) {
   if (typeof note !== 'string' || !note.trim()) throw new DecisionError('--note is required: say whose call it is and why')
   oneLine(note, '--note')
   oneLine(condition, '--condition')
-  if (!['extend', 'keep', 'retire'].includes(action)) throw new DecisionError(`unknown decision "${action}": use extend, keep or retire`)
+  if (!['extend', 'keep', 'retire', 'adopt-shadow', 'unshadow'].includes(action)) throw new DecisionError(`unknown decision "${action}": use extend, keep, retire, adopt-shadow or unshadow`)
+  if (action.endsWith('shadow') && !task.shadow) throw new DecisionError('this task has no shadow')
+  if (action === 'adopt-shadow' && task.shadow.scope === 'judge') {
+    throw new DecisionError(`adopt-shadow can't switch a judge-scoped shadow yet: set roles.judge to ${task.shadow.model} in TASK.md, then decide unshadow`)
+  }
   const changes = {}
   let line
   if (action === 'extend') {
@@ -31,6 +36,13 @@ export function decide(task, action, { until, condition, note, today }) {
     changes.end = { date: null, condition: null }
     task.end.date = task.end.condition = null
     line = 'keep'
+  } else if (action === 'adopt-shadow') {
+    changes.model = task.model = task.shadow.model
+    changes.shadow = task.shadow = null
+    line = `adopt-shadow (model ${changes.model})`
+  } else if (action === 'unshadow') {
+    changes.shadow = task.shadow = null
+    line = 'unshadow'
   } else {
     changes.status = task.status = 'retired'
     line = 'retire'

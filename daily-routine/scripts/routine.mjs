@@ -4,10 +4,12 @@
 //   node routine.mjs status [--today YYYY-MM-DD]
 //   node routine.mjs record <task-id> <file>
 //   node routine.mjs log <YYYY-MM-DD> <report-file> --summary "<text>"
-//   node routine.mjs decide <task-id> extend|keep|retire [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+//   node routine.mjs decide <task-id> extend|keep|retire|adopt-shadow|unshadow [--until <date>|none] [--condition "<text>"|none] --note "<text>"
 //   node routine.mjs new <task-id> [--title "<text>"]
+//   node routine.mjs shadow <task-id> <main-answer-file> <shadow-answer-file>
+//   node routine.mjs shadow <task-id> --ruling main|shadow|neither --note "<text>"
 //
-// Every command takes [--folder <path>]; record/decide/new also take [--today YYYY-MM-DD].
+// Every command takes [--folder <path>]; record/decide/new/shadow also take [--today YYYY-MM-DD].
 //
 // The routine folder is --folder, else the current folder if it has routine.json, else the
 // folder in ~/.daily-routine.json (written by setup).
@@ -18,9 +20,10 @@ import { fileURLToPath } from 'node:url'
 import { parseConfig, readUserPointer } from './lib/config.mjs'
 import { loadTask, loadTasks, isDate } from './lib/tasks.mjs'
 import { checkRequirements } from './lib/requirements.mjs'
-import { buildStatus } from './lib/status.mjs'
+import { buildStatus, resolveModels } from './lib/status.mjs'
 import { lastHistoryDate, appendHistory, writeRunLog } from './lib/history.mjs'
 import { decide, newTask, DecisionError } from './lib/decide.mjs'
+import { readAnswer, compareResults, formatSide, outcomesOf, appendShadowRow, parseShadowLog } from './lib/shadow.mjs'
 
 const TEMPLATE = join(dirname(fileURLToPath(import.meta.url)), '..', 'templates', 'task', 'TASK.md')
 
@@ -54,7 +57,11 @@ export function readStatus(folder, { today, runChecks = true } = {}) {
   const tasks = loadTasks(folder).map(t => {
     if (t.error) return t
     const file = join(t.dir, 'history.md')
-    return { ...t, lastRun: existsSync(file) ? lastHistoryDate(readFileSync(file, 'utf8')) : null }
+    const shadowFile = join(t.dir, 'shadow.md')
+    return {
+      ...t, lastRun: existsSync(file) ? lastHistoryDate(readFileSync(file, 'utf8')) : null,
+      shadowLog: existsSync(shadowFile) ? parseShadowLog(readFileSync(shadowFile, 'utf8')) : undefined,
+    }
   })
   const names = [...new Set(tasks.filter(t => !t.error && t.status === 'active').flatMap(t => t.requires))]
   const requirementResults = runChecks ? checkRequirements(config.requirements, names) : {}
@@ -98,6 +105,43 @@ const commands = {
   new({ folder, flags, args: [id] }) {
     const task = newTask(folder, id ?? '', { title: text(flags.title), today: text(flags.today) ?? localDate(), template: TEMPLATE })
     console.log(join(task.dir, 'TASK.md'))
+  },
+  shadow({ folder, flags, args: [id, mainFile, shadowFile] }) {
+    const dir = taskDir(folder, id)
+    const task = loadTask(dir)
+    if (!task.shadow) throw new UsageError(`task "${id}" has no shadow`)
+    const now = new Date()
+    const when = `${text(flags.today) ?? localDate(now)} ${now.toISOString().slice(11, 16)}Z`
+    const config = parseConfig(readFileSync(join(folder, 'routine.json'), 'utf8'))
+    const models = { id, mainModel: resolveModels(task, config).model ?? 'the session model', shadowModel: task.shadow.model }
+
+    if (flags.ruling !== undefined) {
+      if (!['main', 'shadow', 'neither'].includes(flags.ruling)) throw new UsageError('--ruling must be main, shadow or neither')
+      if (!text(flags.note)) throw new UsageError('--ruling needs --note "<whose call, their words>"')
+      appendShadowRow(dir, { when, verdict: 'ruling', outcomes: '', main: '', shadow: '', notes: `${flags.ruling} was right - ${flags.note}` }, models)
+      console.log('ruling recorded')
+      return
+    }
+
+    let main
+    try { main = readAnswer(readInput(mainFile)) } catch (e) {
+      if (e instanceof UsageError) throw e
+      throw new UsageError(`main answer unreadable: ${e.message}`)
+    }
+    let row
+    let diffs = []
+    try {
+      const shadow = readAnswer(readInput(shadowFile))
+      const result = compareResults(main, shadow)
+      diffs = result.diffs
+      row = { verdict: result.verdict, shadow: formatSide(shadow), notes: diffs.join('; ') }
+    } catch (e) {
+      if (e instanceof UsageError) throw e
+      row = { verdict: 'error', shadow: '', notes: `shadow answer unreadable: ${e.message}` }
+    }
+    appendShadowRow(dir, { when, outcomes: outcomesOf(main), main: formatSide(main), ...row }, models)
+    const { streak, findingsInStreak } = parseShadowLog(readFileSync(join(dir, 'shadow.md'), 'utf8'))
+    console.log(JSON.stringify({ verdict: row.verdict, diffs, streak, until: task.shadow.until, due: streak >= task.shadow.until, findingsInStreak }))
   },
 }
 

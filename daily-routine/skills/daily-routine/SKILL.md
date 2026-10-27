@@ -1,6 +1,6 @@
 ---
 name: daily-routine
-description: Runs a configured daily routine (for example "run the morning routine"), finishes the tasks that were waiting once a blocker clears ("vpn is up"), records extend / keep / retire decisions about a task ("retire check 16", "extend the upload task to 11/14"), and turns what the current session just learned into a new routine task ("add that to the morning routine"). Use whenever the user names their routine or one of its tasks.
+description: Runs a configured daily routine (for example "run the morning routine"), finishes the tasks that were waiting once a blocker clears ("vpn is up"), records extend / keep / retire decisions about a task ("retire check 16", "extend the upload task to 11/14"), switches or stops a task's shadow model ("switch it to Sonnet", "Opus was right"), and turns what the current session just learned into a new routine task ("add that to the morning routine"). Use whenever the user names their routine or one of its tasks.
 ---
 
 # Daily routine
@@ -32,15 +32,30 @@ runs, hand each task to its own sub-agent on its own model, and write one report
    `roles.fetch` that runs the steps marked as fetch work and returns raw output, then a `judge`
    sub-agent on `roles.judge` that gets that output and returns the result. Sub-agents cannot start
    sub-agents, so you run both steps.
+   A task with a `shadow` in status also gets a second sub-agent on `shadow.model`, started in the
+   same wave from the shadow brief (`references/subagent-brief.md`); it counts as two toward
+   `maxParallel`. With `shadow.scope: full` (the default) the shadow runs the whole task on
+   `shadow.model`, both the fetch and the judge step if the task has `roles`. With
+   `shadow.scope: judge`, the fetch runs once and both judges get the same fetched output.
 3. A later wave's brief includes the day's results of the tasks in its `after`.
 4. Do not start tasks whose `state` is `waiting` or `error`. Every one of them still goes in the
    report: a task with `state: error` (its TASK.md doesn't load, or its `after` names an unknown
    task or forms a cycle) is listed with its `error` text, so a broken file never silently drops
    a check.
-5. For each result, write its `history` text to a temp file and `R record <id> <file>`.
+5. For each result, write its `history` text to a temp file and `R record <id> <file>`. Only the
+   main answer is recorded. For a shadowed task, then save both answers (the main and the
+   shadow's JSON, as they came back) to temp files and run `R shadow <id> <main> <shadow>`; it
+   prints the verdict (`match`, `mismatch`, `error`, or `skipped` when both models errored on
+   every part), the diffs and the streak. If the shadow sub-agent failed or came back empty, write
+   its error text to the shadow file anyway: that records `error` and resets the streak. If the
+   main answer is unreadable, report the task as an error and skip `R shadow`.
 6. Write the report exactly as `references/report-format.md` says. Tasks with `endDue: true`, or
    whose result says `endConditionMet: true`, go under "Needs your call" as retire-or-extend
-   questions. They still ran today.
+   questions. They still ran today. A shadow `mismatch` or `error` goes under "Needs your call" as
+   "the models disagree". The switch question, its streak and its finding count come only from
+   today's `R shadow` output (`due: true`), never from the status read before the run: a mismatch
+   today resets the streak, and the report must not ask to switch in the same breath. A shadowed
+   task that didn't run today gets no shadow item. The report body uses only the main answer.
 7. Save the report: write it to a temp file, then `R log <today> <file> --summary "<one line>"`.
 8. Remember which tasks were waiting and on what. The user will tell you when that clears.
 
@@ -60,12 +75,20 @@ statement or call from that file, word for word. Only after the user explicitly 
 statement do you run it yourself (never a sub-agent), following memory's rules for writes. Then
 re-run the task's detection step, and `R record` the outcome ("fixed <id>, re-run 0 rows").
 
-## 5. Decisions about a task's end
+## 5. Decisions about a task's end or its shadow
 
 Turn the user's words into `R decide <id> extend|keep|retire [--until YYYY-MM-DD|none]
 [--condition "<text>"|none] --note "<who decided, their words>"`. Never decide on your own: no
 retiring because an end date passed, no extending because a check is still useful. When a task
 has a decision note "retire together with <id>", ask about both in the same question.
+
+Shadows follow the same rule; nothing turns a shadow off on its own, however long the streak:
+
+- "Switch it to Sonnet" (the shadow's model): `R decide <id> adopt-shadow --note "<words>"`.
+- "Stop shadowing it" (keep the main model): `R decide <id> unshadow --note "<words>"`.
+- "Keep comparing": no command; the shadow keeps running and the question comes back next run.
+- On a mismatch, "Opus was right" / "Sonnet was right" / "neither": `R shadow <id> --ruling
+  main|shadow|neither --note "<words>"`.
 
 ## 6. Add a task
 

@@ -12,6 +12,7 @@ decisions: []                  # every add / extend / keep / retire, appended by
 requires: []                   # requirement names from routine.json, like [vpn]
 model: null                    # overrides routine.json's model for this task
 roles: {}                      # optional: fetch: sonnet, judge: opus
+shadow: null                   # optional: model: sonnet, until: 5 (scope: full | judge)
 memory: []                     # global memory entries this task relies on (file names without .md)
 shared: []                     # files in the routine's shared/ folder this task needs
 after: []                      # tasks that must run first; their results are handed to this one

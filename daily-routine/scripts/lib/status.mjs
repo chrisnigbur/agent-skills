@@ -5,6 +5,14 @@ export function resolveModels(task, config, sessionModel = null) {
   return { model: task.model ?? config.model ?? sessionModel, roles: { ...task.roles } }
 }
 
+// The shadow and its streak; due once the streak reaches the target, and it stays due (nothing
+// turns a shadow off on its own: only the user's decision does).
+function shadowOf(task) {
+  if (!task.shadow) return { shadow: null, shadowDue: false }
+  const { streak, findingsInStreak } = task.shadowLog ?? { streak: 0, findingsInStreak: 0 }
+  return { shadow: { ...task.shadow, streak, findingsInStreak }, shadowDue: streak >= task.shadow.until }
+}
+
 export function buildStatus({ config, tasks, requirementResults, today }) {
   const retired = tasks.filter(t => !t.error && t.status === 'retired')
   const retiredIds = new Set(retired.map(t => t.id))
@@ -22,6 +30,7 @@ export function buildStatus({ config, tasks, requirementResults, today }) {
       waitingOn: t.requires.filter(name => requirementResults[name]?.met === false),
       endDue: t.end.date !== null && today > t.end.date,
       endCondition: t.end.condition, then: t.end.then, lastRun: t.lastRun ?? null,
+      ...shadowOf(t),
       error: unknown.length ? `after names unknown task "${unknown[0]}"` : null,
     }]
   }))

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadTask } from '../lib/tasks.mjs'
 import { cli, routine } from './fixtures.mjs'
@@ -133,4 +133,52 @@ test('decide and new refuse text with a line break', () => {
   assert.equal(cli(folder, 'decide', 'a-task', 'extend', '--condition', 'a\nb', '--note', 'n').status, 1)
   assert.equal(cli(folder, 'new', 'b-task', '--title', 'a\r\nb').status, 1)
   assert.equal(load(folder).decisions.length, 0)
+})
+
+const SHADOWED = '---\nid: a-task\ntitle: A\nmodel: opus\nshadow:\n  model: sonnet\n  until: 5\nmemory: []\n---\n\nbody\n'
+
+test('decide adopt-shadow switches the model and removes the shadow', () => {
+  const folder = routine({ 'a-task': SHADOWED })
+  const r = cli(folder, 'decide', 'a-task', 'adopt-shadow', '--note', 'Chris: switch it to Sonnet', '--today', '2026-11-02')
+  assert.equal(r.status, 0, r.stderr)
+  const t = load(folder)
+  assert.equal(t.model, 'sonnet')
+  assert.equal(t.shadow, null)
+  assert.deepEqual(t.decisions, ['2026-11-02: adopt-shadow (model sonnet) - Chris: switch it to Sonnet'])
+  assert.deepEqual(t.memory, [])
+})
+
+test('decide unshadow keeps the model', () => {
+  const folder = routine({ 'a-task': SHADOWED })
+  assert.equal(cli(folder, 'decide', 'a-task', 'unshadow', '--note', 'Chris: Sonnet misses too much', '--today', '2026-11-02').status, 0)
+  const t = load(folder)
+  assert.equal(t.model, 'opus')
+  assert.equal(t.shadow, null)
+  assert.deepEqual(t.decisions, ['2026-11-02: unshadow - Chris: Sonnet misses too much'])
+})
+
+test('decide adopt-shadow without a shadow -> exit 1 "this task has no shadow"', () => {
+  const folder = routine()
+  for (const action of ['adopt-shadow', 'unshadow']) {
+    const r = cli(folder, 'decide', 'a-task', action, '--note', 'n')
+    assert.equal(r.status, 1)
+    assert.match(r.stderr, /this task has no shadow/)
+  }
+  assert.match(cli(folder, 'decide', 'a-task', 'pause', '--note', 'n').stderr, /use extend, keep, retire, adopt-shadow or unshadow/)
+})
+
+test('decide: shadow.md is left in place after either', () => {
+  const folder = routine({ 'a-task': SHADOWED })
+  writeFileSync(join(folder, 'tasks', 'a-task', 'shadow.md'), '# Shadow log: a-task\n')
+  cli(folder, 'decide', 'a-task', 'unshadow', '--note', 'n')
+  assert.equal(readFileSync(join(folder, 'tasks', 'a-task', 'shadow.md'), 'utf8'), '# Shadow log: a-task\n')
+})
+
+test('decide adopt-shadow refuses a judge-scoped shadow and leaves the file alone', () => {
+  const text = '---\nid: a-task\ntitle: A\nroles:\n  fetch: sonnet\n  judge: opus\nshadow:\n  model: haiku\n  scope: judge\n---\n\nbody\n'
+  const folder = routine({ 'a-task': text })
+  const r = cli(folder, 'decide', 'a-task', 'adopt-shadow', '--note', 'n')
+  assert.equal(r.status, 1)
+  assert.match(r.stderr, /judge-scoped shadow/)
+  assert.equal(readFileSync(join(folder, 'tasks', 'a-task', 'TASK.md'), 'utf8'), text)
 })

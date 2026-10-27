@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFrontmatter, writeFrontmatter } from '../lib/frontmatter.mjs'
+import { parseFrontmatter, writeFrontmatter, updateFrontmatter } from '../lib/frontmatter.mjs'
 import { EXAMPLE } from './fixtures.mjs'
 
 test('frontmatter: round-trip of the design example TASK.md', () => {
@@ -61,4 +61,18 @@ test('frontmatter: a UTF-8 BOM and trailing spaces on --- lines are accepted', (
   const parsed = parseFrontmatter('\uFEFF--- \nid: x\n---  \nbody\n')
   assert.deepEqual(parsed.data, { id: 'x' })
   assert.equal(parsed.body, 'body\n')
+})
+
+test('update: model set keeps its comment, and is added when missing', () => {
+  const text = '---\nid: a\nmodel: sonnet   # cheap\nroles: {}\n---\nbody\n'
+  assert.equal(updateFrontmatter(text, { model: 'opus' }), '---\nid: a\nmodel: opus   # cheap\nroles: {}\n---\nbody\n')
+  assert.equal(updateFrontmatter('---\nid: a\n---\nbody\n', { model: 'opus' }), '---\nid: a\nmodel: opus\n---\nbody\n')
+})
+
+test('update: shadow null removes the block only, byte for byte (CRLF)', () => {
+  const lines = ['---', 'id: a', 'roles: {}', 'shadow:            # trying sonnet', '  model: sonnet', '  until: 5', '# a comment line', 'memory: []', '---', '', 'body']
+  const text = lines.join('\r\n')
+  const expected = lines.filter((_, i) => i < 3 || i > 5).join('\r\n')
+  assert.equal(updateFrontmatter(text, { shadow: null }), expected)
+  assert.equal(updateFrontmatter(expected, { shadow: null }), expected)
 })

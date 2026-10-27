@@ -80,3 +80,31 @@ test('saveTask: changing end.date keeps body bytes identical', () => {
   assert.equal(loadTask(dir).end.date, '2026-12-31')
   assert.ok(!/[^\r]\n/.test(text), 'still CRLF')
 })
+
+const withShadow = lines => `---\nid: s-task\ntitle: S\n${lines}\n---\n\nbody\n`
+const shadowOf = lines => loadTasks(routineWith({ 's-task': withShadow(lines) }))[0]
+
+test('shadow: missing or null -> null', () => {
+  assert.equal(shadowOf('model: opus').shadow, null)
+  assert.equal(shadowOf('shadow: null').shadow, null)
+})
+
+test('shadow: model only -> until 5, scope full', () => {
+  assert.deepEqual(shadowOf('shadow:\n  model: sonnet').shadow, { model: 'sonnet', until: 5, scope: 'full' })
+})
+
+test('shadow: all fields kept', () => {
+  const t = shadowOf('roles:\n  fetch: sonnet\n  judge: opus\nshadow:\n  model: haiku\n  until: 3\n  scope: judge')
+  assert.deepEqual(t.shadow, { model: 'haiku', until: 3, scope: 'judge' })
+})
+
+test('shadow: errors name the field', () => {
+  const cases = [
+    ['shadow:\n  until: 5', 'shadow.model must be a model name like "sonnet"'],
+    ['shadow:\n  model: sonnet\n  until: 0', 'shadow.until must be a whole number of runs, 1 or more'],
+    ['shadow:\n  model: sonnet\n  until: two', 'shadow.until must be a whole number of runs, 1 or more'],
+    ['shadow:\n  model: sonnet\n  scope: half', 'shadow.scope must be full or judge'],
+    ['shadow:\n  model: sonnet\n  scope: judge', 'shadow.scope judge needs roles (fetch and judge)'],
+  ]
+  for (const [lines, error] of cases) assert.equal(shadowOf(lines).error, error, lines)
+})

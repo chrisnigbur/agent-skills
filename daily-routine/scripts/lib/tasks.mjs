@@ -33,13 +33,27 @@ function toTask(dir, data, body, eol) {
   const roles = data.roles ?? {}
   if (typeof roles !== 'object' || Array.isArray(roles)) throw new Error('roles must map role names to models')
   for (const [role, m] of Object.entries(roles)) if (!isModelName(m)) throw new Error(`roles.${role} must be a model name like "sonnet"`)
+  const shadow = toShadow(data.shadow ?? null, roles)
   const lists = {}
   for (const k of LISTS) {
     const v = data[k] ?? []
     if (!Array.isArray(v) || v.some(x => typeof x !== 'string')) throw new Error(`${k} must be a list`)
     lists[k] = v
   }
-  return { ...data, id, dir, title: data.title, ticket: data.ticket ?? null, status, added, end, ...lists, model, roles, body, eol }
+  return { ...data, id, dir, title: data.title, ticket: data.ticket ?? null, status, added, end, ...lists, model, roles, shadow, body, eol }
+}
+
+// A shadow model runs the same brief beside the main one so the two answers can be compared.
+function toShadow(shadow, roles) {
+  if (shadow === null) return null
+  if (typeof shadow !== 'object' || Array.isArray(shadow)) throw new Error('shadow must have a model, like "model: sonnet"')
+  if (!isModelName(shadow.model)) throw new Error('shadow.model must be a model name like "sonnet"')
+  const until = shadow.until ?? 5
+  if (!Number.isInteger(until) || until < 1) throw new Error('shadow.until must be a whole number of runs, 1 or more')
+  const scope = shadow.scope ?? 'full'
+  if (!['full', 'judge'].includes(scope)) throw new Error('shadow.scope must be full or judge')
+  if (scope === 'judge' && !(roles.fetch && roles.judge)) throw new Error('shadow.scope judge needs roles (fetch and judge)')
+  return { model: shadow.model, until, scope }
 }
 
 export function loadTask(dir) {
