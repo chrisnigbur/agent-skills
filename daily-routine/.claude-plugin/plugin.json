@@ -1,0 +1,5 @@
+{
+  "name": "daily-routine",
+  "description": "A configurable daily routine: tasks with end dates, run by sub-agents on their own models, reported in one place.",
+  "author": { "name": "chrisnigbur" }
+}

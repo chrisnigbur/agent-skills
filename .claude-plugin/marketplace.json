@@ -1,0 +1,14 @@
+{
+  "name": "agent-skills",
+  "owner": {
+    "name": "chrisnigbur"
+  },
+  "description": "Agent skills and Claude Code plugins.",
+  "plugins": [
+    {
+      "name": "daily-routine",
+      "source": "./daily-routine",
+      "description": "A configurable daily routine: tasks with end dates, run by sub-agents on their own models, reported in one place."
+    }
+  ]
+}

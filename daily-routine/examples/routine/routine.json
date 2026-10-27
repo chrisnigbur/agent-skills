@@ -1,0 +1,13 @@
+{
+  "name": "example routine",
+  "memory": null,
+  "model": "sonnet",
+  "maxParallel": 4,
+  "requirements": {
+    "vpn": {
+      "check": "ping -n 1 -w 2000 internal.example.com",
+      "hint": "Connect the VPN, then say \"vpn is up\"."
+    }
+  },
+  "schedule": null
+}
