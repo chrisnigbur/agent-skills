@@ -50,6 +50,7 @@ Three sections, in this order:
 
 ## Changing a task
 
-- End and status: only through `routine.mjs decide` with the user's words.
+- End, status, model, requires and shadow: only through `routine.mjs decide` with the user's
+  words (`extend`, `keep`, `retire`, `unretire`, `set`, `adopt-shadow`, `unshadow`).
 - Steps and reading rules: edit the body; mention the change in the next history entry.
 - Retiring keeps the folder; nothing is deleted.

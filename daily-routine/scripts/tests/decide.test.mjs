@@ -164,7 +164,7 @@ test('decide adopt-shadow without a shadow -> exit 1 "this task has no shadow"',
     assert.equal(r.status, 1)
     assert.match(r.stderr, /this task has no shadow/)
   }
-  assert.match(cli(folder, 'decide', 'a-task', 'pause', '--note', 'n').stderr, /use extend, keep, retire, adopt-shadow or unshadow/)
+  assert.match(cli(folder, 'decide', 'a-task', 'pause', '--note', 'n').stderr, /use extend, keep, retire, unretire, set, adopt-shadow or unshadow/)
 })
 
 test('decide: shadow.md is left in place after either', () => {
