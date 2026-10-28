@@ -2,9 +2,11 @@
 // The exact parts of a daily routine, called by the daily-routine skill:
 //
 //   node routine.mjs status [--today YYYY-MM-DD]
+//   node routine.mjs list [--json]
 //   node routine.mjs record <task-id> <file>
 //   node routine.mjs log <YYYY-MM-DD> <report-file> --summary "<text>"
-//   node routine.mjs decide <task-id> extend|keep|retire|adopt-shadow|unshadow [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+//   node routine.mjs decide <task-id> extend|keep|retire|unretire|adopt-shadow|unshadow [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+//   node routine.mjs decide <task-id> set [--model <model>|none] [--requires <a,b>|none] [--shadow <model>|none] --note "<text>"
 //   node routine.mjs new <task-id> [--title "<text>"]
 //   node routine.mjs shadow <task-id> <main-answer-file> <shadow-answer-file>
 //   node routine.mjs shadow <task-id> --ruling main|shadow|neither --note "<text>"
@@ -21,6 +23,7 @@ import { parseConfig, readUserPointer } from './lib/config.mjs'
 import { loadTask, loadTasks, isDate } from './lib/tasks.mjs'
 import { checkRequirements } from './lib/requirements.mjs'
 import { buildStatus, resolveModels } from './lib/status.mjs'
+import { buildList, formatList } from './lib/list.mjs'
 import { lastHistoryDate, appendHistory, writeRunLog } from './lib/history.mjs'
 import { decide, newTask, DecisionError } from './lib/decide.mjs'
 import { readAnswer, compareResults, formatSide, outcomesOf, appendShadowRow, parseShadowLog } from './lib/shadow.mjs'
@@ -52,9 +55,9 @@ export function findFolder(flags, { cwd = process.cwd(), home = homedir() } = {}
   return readUserPointer(home)?.folder ?? null
 }
 
-export function readStatus(folder, { today, runChecks = true } = {}) {
-  const config = parseConfig(readFileSync(join(folder, 'routine.json'), 'utf8'))
-  const tasks = loadTasks(folder).map(t => {
+// Every task with its last run date and shadow log, as status and list read them.
+function loadTasksWithLogs(folder) {
+  return loadTasks(folder).map(t => {
     if (t.error) return t
     const file = join(t.dir, 'history.md')
     const shadowFile = join(t.dir, 'shadow.md')
@@ -63,6 +66,13 @@ export function readStatus(folder, { today, runChecks = true } = {}) {
       shadowLog: existsSync(shadowFile) ? parseShadowLog(readFileSync(shadowFile, 'utf8')) : undefined,
     }
   })
+}
+
+const readConfig = folder => parseConfig(readFileSync(join(folder, 'routine.json'), 'utf8'))
+
+export function readStatus(folder, { today, runChecks = true } = {}) {
+  const config = readConfig(folder)
+  const tasks = loadTasksWithLogs(folder)
   const names = [...new Set(tasks.filter(t => !t.error && t.status === 'active').flatMap(t => t.requires))]
   const requirementResults = runChecks ? checkRequirements(config.requirements, names) : {}
   return buildStatus({ config, tasks, requirementResults, today })
@@ -85,6 +95,10 @@ const commands = {
   status({ folder, flags }) {
     console.log(JSON.stringify(readStatus(folder, { today: flags.today ?? localDate() }), null, 2))
   },
+  list({ folder, flags }) {
+    const list = buildList({ config: readConfig(folder), tasks: loadTasksWithLogs(folder) })
+    console.log(flags.json ? JSON.stringify(list, null, 2) : formatList(list))
+  },
   record({ folder, flags, args: [id, file] }) {
     const dir = taskDir(folder, id)
     const now = new Date()
@@ -99,7 +113,12 @@ const commands = {
   },
   decide({ folder, flags, args: [id, action] }) {
     const task = loadTask(taskDir(folder, id))
-    decide(task, action, { until: text(flags.until), condition: text(flags.condition), note: text(flags.note), today: text(flags.today) ?? localDate() })
+    const requires = text(flags.requires) === undefined ? undefined
+      : flags.requires === 'none' ? [] : flags.requires.split(',').map(name => name.trim()).filter(Boolean)
+    decide(task, action, {
+      until: text(flags.until), condition: text(flags.condition), note: text(flags.note), today: text(flags.today) ?? localDate(),
+      model: text(flags.model), requires, shadow: text(flags.shadow), requirementNames: Object.keys(readConfig(folder).requirements),
+    })
     console.log(`${id}: ${task.decisions[task.decisions.length - 1]}`)
   },
   new({ folder, flags, args: [id] }) {
@@ -145,11 +164,42 @@ const commands = {
   },
 }
 
+const HELP = `routine.mjs: the exact parts of a daily routine (the daily-routine skill calls these; you can too).
+
+Commands:
+  status [--today YYYY-MM-DD]        what can run now: runs each requirement check, prints JSON
+  list [--json]                      every task (model, shadow, requires, end, last run); runs no checks
+  record <task-id> <file>            append the file to the task's history.md
+  log <YYYY-MM-DD> <report-file> --summary "<text>"
+                                     save the day's report to runs/ and its row in run-log.md
+  decide <task-id> extend [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+  decide <task-id> keep|retire|unretire --note "<text>"
+  decide <task-id> set [--model <model>|none] [--requires <a,b>|none] [--shadow <model>|none] --note "<text>"
+  decide <task-id> adopt-shadow|unshadow --note "<text>"
+                                     the user's decision about a task, kept as a dated line in TASK.md
+  new <task-id> [--title "<text>"]   create tasks/<task-id>/TASK.md from the template
+  shadow <task-id> <main-answer-file> <shadow-answer-file>
+  shadow <task-id> --ruling main|shadow|neither --note "<text>"
+                                     compare a shadowed task's two answers, or record whose was right
+  help                               this text (also --help)
+
+Every command takes --folder <path>; record, log, decide, new and shadow also take --today.
+The routine folder is --folder, else the current folder if it has routine.json, else the folder
+setup saved in ~/.daily-routine.json.`
+
 export function main(argv) {
   const { positional, flags } = parseArgs(argv)
   const [name, ...rest] = positional
+  if (name === 'help' || (name === undefined && flags.help)) {
+    const found = findFolder(flags)
+    const folder = found && existsSync(join(found, 'routine.json')) ? found : null
+    console.log(`${HELP}
+
+Routine folder: ${folder ?? 'none yet (run /daily-routine:setup)'}`)
+    return 0
+  }
   const command = commands[name]
-  if (!command) { console.error(`usage: routine.mjs <${Object.keys(commands).join('|')}> ...`); return 1 }
+  if (!command) { console.error(name ? `unknown command "${name}": run routine.mjs help` : 'usage: routine.mjs <command> ...: run routine.mjs help'); return 1 }
   const folder = findFolder(flags)
   if (!folder || !existsSync(join(folder, 'routine.json'))) {
     console.error('no routine folder: run /daily-routine:setup (or pass --folder)')

@@ -28,6 +28,9 @@ Setup asks for:
 - a default model
 - whether to turn on automatic updates
 
+`/daily-routine:help` shows what you can say to the routine, where your routine folder is,
+whether the plugin is up to date, and the tasks in it.
+
 ### Private repo
 
 The repo is private. Claude Code has no GitHub token of its own: it runs `git` with prompts turned
@@ -101,9 +104,13 @@ The skill calls these, and you can too:
 
 ```
 node scripts/routine.mjs status [--today YYYY-MM-DD]
+node scripts/routine.mjs list [--json]
+node scripts/routine.mjs help
 node scripts/routine.mjs record <task-id> <file>
 node scripts/routine.mjs log <YYYY-MM-DD> <report-file> --summary "<text>"
-node scripts/routine.mjs decide <task-id> extend|keep|retire [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+node scripts/routine.mjs decide <task-id> extend|keep|retire|unretire [--until <date>|none] [--condition "<text>"|none] --note "<text>"
+node scripts/routine.mjs decide <task-id> set [--model <model>|none] [--requires <a,b>|none] [--shadow <model>|none] --note "<text>"
+node scripts/routine.mjs decide <task-id> adopt-shadow|unshadow --note "<text>"
 node scripts/routine.mjs new <task-id> [--title "<text>"]
 ```
 

@@ -144,8 +144,8 @@ export function writeFrontmatter({ data, body, eol = '\n' }) {
 
 // Changes a few keys in place and leaves every other line, its comments and the body exactly as
 // they were. `changes` may set `status` and `model` (scalars), `end` (sub-keys to set),
-// `decisions` (the full list; items beyond those already in the file are appended) and
-// `shadow: null` (removes the shadow block).
+// `requires` (the full list, written inline), `decisions` (the full list; items beyond those
+// already in the file are appended) and `shadow` (null removes the block; an object replaces it).
 export function updateFrontmatter(text, changes) {
   const bom = text.startsWith('﻿') ? '﻿' : ''
   const { lines, close, eol } = split(text)
@@ -159,9 +159,22 @@ export function updateFrontmatter(text, changes) {
     lines[i] = `${prefix} ${quote(v)}${comment.trim() ? comment : ''}`
   }
 
-  if ('shadow' in changes && changes.shadow === null) {
-    const i = topIndex('shadow')
-    if (i !== -1) { const stop = blockEnd(i); lines.splice(i, stop - i); end -= stop - i }
+  if ('shadow' in changes) {
+    let i = topIndex('shadow')
+    if (i !== -1) { const stop = blockEnd(i); lines.splice(i, stop - i); end -= stop - i } else i = end
+    if (changes.shadow) insert(i, ['shadow:', ...Object.entries(changes.shadow).map(([k, v]) => `  ${k}: ${quote(v)}`)])
+  }
+  if (changes.requires) {
+    const line = `requires: [${changes.requires.map(quote).join(', ')}]`
+    const i = topIndex('requires')
+    if (i === -1) insert(end, [line])
+    else {
+      const stop = blockEnd(i) // a block list (`requires:` then `  - x` lines) becomes one inline line
+      if (stop > i + 1) { lines.splice(i + 1, stop - i - 1); end -= stop - i - 1 }
+      const kept = stripComment(lines[i]).replace(/\s+$/, '')
+      const comment = lines[i].slice(kept.length)
+      lines[i] = line + (comment.trim() ? comment : '')
+    }
   }
   for (const key of ['status', 'model']) {
     if (!(key in changes)) continue

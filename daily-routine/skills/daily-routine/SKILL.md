@@ -1,6 +1,6 @@
 ---
 name: daily-routine
-description: Runs a configured daily routine (for example "run the morning routine"), finishes the tasks that were waiting once a blocker clears ("vpn is up"), records extend / keep / retire decisions about a task ("retire check 16", "extend the upload task to 11/14"), switches or stops a task's shadow model ("switch it to Sonnet", "Opus was right"), and turns what the current session just learned into a new routine task ("add that to the morning routine"). Use whenever the user names their routine or one of its tasks.
+description: Runs a configured daily routine (for example "run the morning routine"), finishes the tasks that were waiting once a blocker clears ("vpn is up"), lists the routine's tasks without running them ("list the daily routine tasks"), records extend / keep / retire / unretire decisions about a task ("retire check 16", "extend the upload task to 11/14", "bring check 16 back"), changes a task's model, requirements or shadow ("the backup check needs database access, not the VPN"), switches or stops a task's shadow model ("switch it to Sonnet", "Opus was right"), and turns what the current session just learned into a new routine task ("add that to the morning routine"). Use whenever the user names their routine or one of its tasks.
 ---
 
 # Daily routine
@@ -75,12 +75,26 @@ statement or call from that file, word for word. Only after the user explicitly 
 statement do you run it yourself (never a sub-agent), following memory's rules for writes. Then
 re-run the task's detection step, and `R record` the outcome ("fixed <id>, re-run 0 rows").
 
-## 5. Decisions about a task's end or its shadow
+## 5. List the tasks, and manage them
 
-Turn the user's words into `R decide <id> extend|keep|retire [--until YYYY-MM-DD|none]
-[--condition "<text>"|none] --note "<who decided, their words>"`. Never decide on your own: no
-retiring because an end date passed, no extending because a check is still useful. When a task
-has a decision note "retire together with <id>", ask about both in the same question.
+"List the tasks" (or "what's in the routine"): `R list`. It reads the task files and runs no
+requirement checks, so it is quick and touches nothing. Show its table as it prints, then the
+retired tasks and any task file with a problem. Use `R list --json` when you need the values.
+
+Turn the user's words about a task into `R decide`, always with `--note "<who decided, their
+words>"`; every decision is a dated line in the task's `decisions`:
+
+- End date or condition: `R decide <id> extend [--until YYYY-MM-DD|none] [--condition "<text>"|none]`,
+  or `keep` for no end.
+- "Remove it" means retire: `R decide <id> retire`. The folder and its history stay; nothing is
+  deleted. "Bring it back": `R decide <id> unretire`.
+- Model, requirements, shadow: `R decide <id> set [--model <model>|none] [--requires a,b|none]
+  [--shadow <model>|none]`. `--requires` replaces the whole list and takes only names
+  `routine.json` defines; `--model none` falls back to the routine's default model.
+
+Never edit a task's frontmatter by hand for these, and never decide on your own: no retiring
+because an end date passed, no extending because a check is still useful. When a task has a
+decision note "retire together with <id>", ask about both in the same question.
 
 Shadows follow the same rule; nothing turns a shadow off on its own, however long the streak:
 
