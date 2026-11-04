@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
+import { join, dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseFrontmatter } from '../lib/frontmatter.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PLUGIN = join(HERE, '..', '..')
-const REPO = join(PLUGIN, '..')
+const REPO = resolve(PLUGIN, '..')
 
 test('example routine loads and status is sane', () => {
   const r = spawnSync(process.execPath, [join(PLUGIN, 'scripts', 'routine.mjs'), 'status', '--folder', join(PLUGIN, 'examples', 'routine'), '--today', '2026-10-27'], { encoding: 'utf8' })
@@ -37,23 +37,82 @@ test('the report never drops a task whose file has a problem (state error)', () 
 })
 
 // Only the engine goes in this repo: no account numbers, home paths or the owner's surname.
-const FORBIDDEN = /\b\d{12}\b|nig[b]ur|[A-Z]:\\Users\\/i
-function* files(dir) {
-  for (const name of readdirSync(dir)) {
-    if (['.git', 'node_modules', '.superpowers'].includes(name)) continue
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) yield* files(p)
-    else yield p
+// The patterns are generic, so this file names nothing private and is scanned too. Anything
+// else you never want published is kept OUT of the repo: point PRIVATE_TERMS_FILE at a file
+// outside it with one regular expression per line.
+const GENERIC = [
+  ['aws-account-id', /\b\d{12}\b/],
+  ['windows-home-path', /[A-Z]:\\Users\\/i],
+  // Written so the pattern's own source does not match it.
+  ['owner-surname', /nig[b]ur/i],
+]
+
+function privateTerms() {
+  const termsFile = process.env.PRIVATE_TERMS_FILE
+
+  if (!termsFile) {
+    return []
+  }
+
+  const resolved = resolve(termsFile)
+  const inside = resolved === REPO || resolved.startsWith(REPO + sep)
+
+  assert.ok(!inside, 'PRIVATE_TERMS_FILE must live outside the repo')
+
+  return readFileSync(termsFile, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== '')
+    .map((line, index) => [`private-term-${index + 1}`, new RegExp(line.trim(), 'i')])
+}
+
+function* files(directory) {
+  for (const name of readdirSync(directory)) {
+    if (['.git', 'node_modules', '.superpowers'].includes(name)) {
+      continue
+    }
+
+    const path = join(directory, name)
+
+    if (statSync(path).isDirectory()) {
+      yield* files(path)
+    } else {
+      yield path
+    }
   }
 }
 
+// Each generic check catches its kind of value. The samples are built at run time so no real
+// value is written down here.
+test('the generic checks catch each kind of private value', () => {
+  const samples = [
+    ['aws-account-id', `arn:aws:iam::${'1'.repeat(12)}:role/x`],
+    ['windows-home-path', ['C:', 'Users', 'someone'].join(String.fromCharCode(92))],
+    ['owner-surname', 'nig' + 'bur'],
+  ]
+
+  for (const [category, sample] of samples) {
+    const [, pattern] = GENERIC.find(([name]) => name === category)
+
+    assert.match(sample, pattern, category)
+  }
+})
+
+// Reports path, line and category only, never the matching text.
 test('no private data in the repo', () => {
+  const checks = [...GENERIC, ...privateTerms()]
   const hits = []
+
   for (const file of files(REPO)) {
-    if (file === fileURLToPath(import.meta.url)) continue
-    readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
-      if (FORBIDDEN.test(line.replace(/chrisnigbur/gi, ''))) hits.push(`${relative(REPO, file)}:${i + 1}: ${line.trim().slice(0, 100)}`)
+    readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, index) => {
+      const owned = line.replace(/chrisnigbur/gi, '')
+
+      for (const [category, pattern] of checks) {
+        if (pattern.test(owned)) {
+          hits.push(`${relative(REPO, file)}:${index + 1}: ${category}`)
+        }
+      }
     })
   }
+
   assert.deepEqual(hits, [])
 })
