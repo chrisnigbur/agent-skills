@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, dirname, relative, resolve, sep } from 'node:path'
+import { join, dirname, relative, resolve, sep, isAbsolute, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseFrontmatter } from '../lib/frontmatter.mjs'
 
@@ -47,6 +47,17 @@ const GENERIC = [
   ['owner-surname', /nig[b]ur/i],
 ]
 
+// path.relative handles a different drive and Windows' case-insensitive names; a name that
+// merely starts with ".." (like "..private") is still inside.
+function isInside(directory, candidate, paths = { relative, resolve, sep, isAbsolute }) {
+  const fromDirectory = paths.relative(paths.resolve(directory), paths.resolve(candidate))
+  const outside = fromDirectory === '..'
+    || fromDirectory.startsWith('..' + paths.sep)
+    || paths.isAbsolute(fromDirectory)
+
+  return !outside
+}
+
 function privateTerms() {
   const termsFile = process.env.PRIVATE_TERMS_FILE
 
@@ -54,10 +65,7 @@ function privateTerms() {
     return []
   }
 
-  const resolved = resolve(termsFile)
-  const inside = resolved === REPO || resolved.startsWith(REPO + sep)
-
-  assert.ok(!inside, 'PRIVATE_TERMS_FILE must live outside the repo')
+  assert.ok(!isInside(REPO, termsFile), 'PRIVATE_TERMS_FILE must live outside the repo')
 
   return readFileSync(termsFile, 'utf8')
     .split(/\r?\n/)
@@ -95,6 +103,18 @@ test('the generic checks catch each kind of private value', () => {
 
     assert.match(sample, pattern, category)
   }
+})
+
+test('a terms file counts as inside the repo only when it really is', () => {
+  const repo = 'C:\\work\\repo'
+
+  assert.equal(isInside(repo, 'C:\\work\\repo\\terms.txt', win32), true)
+  assert.equal(isInside(repo, 'C:\\WORK\\REPO\\terms.txt', win32), true)
+  assert.equal(isInside(repo, 'C:\\work\\repo\\..private\\terms.txt', win32), true)
+  assert.equal(isInside(repo, 'C:\\work\\repo', win32), true)
+  assert.equal(isInside(repo, 'C:\\work\\terms.txt', win32), false)
+  assert.equal(isInside(repo, 'D:\\terms.txt', win32), false)
+  assert.equal(isInside(repo, 'C:\\work\\repo-private\\terms.txt', win32), false)
 })
 
 // Reports path, line and category only, never the matching text.
