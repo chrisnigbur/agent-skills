@@ -125,3 +125,7 @@ node --test "daily-routine/scripts/tests/*.test.mjs"
 
 Node 18 or newer, no dependencies. The scheduled-run option (`schedule` in `routine.json`) is
 reserved and not used yet.
+
+To step through a test in VS Code, open the test file, set breakpoints, and start **Debug
+current test file** from Run and Debug (Ctrl+Shift+D, then F5). It runs that file with
+`node --test` and no time limit, so a test can wait at a breakpoint.

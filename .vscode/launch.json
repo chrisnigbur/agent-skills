@@ -5,7 +5,7 @@
       "name": "Debug current test file",
       "type": "node",
       "request": "launch",
-      "runtimeArgs": ["--test", "--test-timeout=0"],
+      "runtimeArgs": ["--test"],
       "program": "${file}",
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
