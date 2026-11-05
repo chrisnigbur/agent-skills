@@ -5,6 +5,7 @@
       "name": "Debug current test file",
       "type": "node",
       "request": "launch",
+      "runtimeExecutable": "node",
       "runtimeArgs": ["--test"],
       "program": "${file}",
       "skipFiles": ["<node_internals>/**"],

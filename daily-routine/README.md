@@ -114,6 +114,9 @@ node scripts/routine.mjs decide <task-id> adopt-shadow|unshadow --note "<text>"
 node scripts/routine.mjs new <task-id> [--title "<text>"]
 ```
 
+In these lines `<...>` is a value to fill in, `[...]` is optional and `|` separates choices;
+type one choice, without the brackets. The commands run the same in Bash and PowerShell.
+
 Every command takes `--folder <path>`. Without it, it uses the current folder if it has
 `routine.json`, else the folder setup recorded in `~/.daily-routine.json`.
 
